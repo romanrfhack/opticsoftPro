@@ -1,0 +1,83 @@
+@import '@angular/material/prebuilt-themes/indigo-pink.css';
+
+@import "tailwindcss";
+
+/* Component layer (clases utilitarias propias) */
+@layer components {
+  .container {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 80rem; /* max-w-7xl */
+    padding-left: 1rem; /* px-4 */
+    padding-right: 1rem;
+  }
+  .card {
+    background-color: #fff; /* bg-white */
+    border-radius: 1rem; /* rounded-2xl */
+    box-shadow: 0 2px 8px 0 rgba(99, 102, 241, 0.08); /* shadow-soft (approximate) */
+    border: 1px solid #f3f4f6; /* border border-gray-100 */
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem; /* gap-2 */
+    border-radius: 0.75rem; /* rounded-xl */
+    padding-left: 1rem; /* px-4 */
+    padding-right: 1rem;
+    padding-top: 0.5rem; /* py-2 */
+    padding-bottom: 0.5rem;
+    font-weight: 500; /* font-medium */
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background-color: #06b6d4; /* bg-brand-600 */
+    color: #fff; /* text-white */
+  }
+  .btn-primary:hover {
+    background-color: #4338ca; /* hover:bg-brand-700 */
+  }
+  .link {
+    color: #4f46e5; /* text-brand-600 */
+    text-decoration: underline;
+  }
+  .link:hover {
+    color: #4338ca; /* hover:text-brand-700 */
+  }
+}
+
+/* Global */
+html, body { height: 100%; }
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: Inter, system-ui, -apple-system, Roboto, 'Segoe UI', 'Helvetica Neue', Arial, 'Noto Sans',
+               'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
+}
+
+/* Material: item activo en el menú */
+.mdc-list-item.active { background: #f3f4f6; }  /* gray-100 */
+.mdc-list-item a { text-decoration: none; }
+
+/* En styles.css o en el archivo de estilos global */
+.snackbar-success {
+  background-color: #10b981 !important;
+  color: white !important;
+}
+
+.snackbar-error {
+  background-color: #ef4444 !important;
+  color: white !important;
+  white-space: pre-wrap; /* Permite saltos de línea */
+  max-width: 500px !important;
+}
+
+.snackbar-info {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+::ng-deep .mat-mdc-dialog-container.historial-dialog .mdc-dialog__surface {
+  border-radius: 1rem;
+  border: 2px solid #06b6d4;
+  box-shadow: 0 4px 30px rgba(6, 182, 212, 0.2);
+}

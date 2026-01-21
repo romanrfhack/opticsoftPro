@@ -1,0 +1,159 @@
+
+:host {
+  display: block;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+apx-chart {
+  width: 100%;
+}
+
+.modern-input {
+  @apply border border-cyan-400/60 rounded-lg px-3 py-2 bg-gray-50 text-gray-800 
+         focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-500 
+         shadow-inner transition duration-200;
+}
+
+.modern-input:hover {
+  @apply border-cyan-500 shadow-md bg-white;
+}
+
+label .material-icons {
+  vertical-align: middle;
+}
+
+.group:hover h4 {
+  color: #06b6d4;
+}
+
+.group:hover .material-icons {
+  color: #06b6d4;
+}
+
+.group:hover {
+  border-color: #06b6d4;
+}
+
+.kpi-card {
+  @apply bg-white p-5 rounded-2xl shadow-md border border-cyan-100 hover:shadow-lg hover:-translate-y-1 
+         transition-all duration-300 group min-w-[260px];
+}
+
+apx-chart {
+  display: block;
+  margin: auto;
+  max-width: 100%;
+}
+
+.kpi-card {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  padding: 1.25rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 20px rgba(6, 182, 212, 0.2);
+}
+
+mat-button-toggle-group {
+  --mat-toggle-selected-color: #06b6d4;
+  --mat-toggle-checked-background-color: #06b6d4;
+  --mat-toggle-focus-color: #06b6d4;
+}
+
+mat-button-toggle {
+  text-transform: none !important;
+  font-weight: 500;
+  color: #4b5563 !important;
+}
+
+mat-button-toggle.mat-button-toggle-checked {
+  color: white !important;
+  background-color: #06b6d4 !important;
+}
+
+/* 🔹 Fade + Grow animation */
+@keyframes fadeGrow {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.kpi-card {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  padding: 1.25rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: fadeGrow 0.4s ease-in-out;
+}
+
+.kpi-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 20px rgba(6, 182, 212, 0.2);
+}
+
+/* 🔹 Fade animation for chart sections */
+.chart-section {
+  opacity: 0;
+  animation: fadeGrow 0.6s ease-in-out forwards;
+}
+
+.table-fade {
+  opacity: 0;
+  animation: fadeGrow 0.5s ease-in-out 0.2s forwards;
+}
+
+.chart-section {
+  opacity: 0;
+  animation: fadeGrow 0.6s ease-in-out forwards;
+}
+
+@keyframes fadeGrow {
+  0% { opacity: 0; transform: scale(0.97); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+mat-form-field {
+  font-size: 13px;
+}
+
+.mat-mdc-form-field {
+  --mdc-outlined-text-field-outline-color: #06b6d4;
+  --mdc-theme-primary: #06b6d4;
+}
+
+.trend {
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+}
+.trend-up {
+  color: #10b981; /* verde */
+}
+.trend-down {
+  color: #ef4444; /* rojo */
+}
+
+.trend {
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: color 0.3s ease;
+}
+.trend-up {
+  color: #10b981;
+}
+.trend-down {
+  color: #ef4444;
+}

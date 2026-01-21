@@ -1,0 +1,148 @@
+<div class="p-6 animate-fade-in">
+  <!-- Título y botón -->
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-2xl font-semibold text-gray-700 flex items-center gap-2">
+      <mat-icon color="primary">business</mat-icon>
+      Gestión de Tenants
+    </h2>
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="toggleForm()"
+      [disabled]="loading"
+    >
+      {{ showForm ? 'Cancelar' : '➕ Nuevo Tenant' }}
+    </button>
+  </div>
+
+  <!-- FORMULARIO -->
+  <mat-card *ngIf="showForm" class="mb-6 shadow-sm fade-in">
+    <form
+      [formGroup]="form"
+      (ngSubmit)="createTenant()"
+      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4"
+    >
+      <mat-form-field appearance="outline">
+        <mat-label>Nombre</mat-label>
+        <input matInput formControlName="nombre" required />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Dominio</mat-label>
+        <input matInput formControlName="dominio" required />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Administrador</mat-label>
+        <input matInput formControlName="adminNombre" required />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Correo del Administrador</mat-label>
+        <input matInput type="email" formControlName="adminEmail" required />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Contraseña inicial</mat-label>
+        <input matInput type="password" formControlName="adminPassword" />
+      </mat-form-field>
+
+      <div class="flex items-center justify-start md:justify-end">
+        <button
+          mat-flat-button
+          color="accent"
+          type="submit"
+          [disabled]="form.invalid || loading"
+        >
+          {{ loading ? 'Guardando...' : 'Guardar' }}
+        </button>
+      </div>
+    </form>
+  </mat-card>
+
+  <!-- CONTADOR SUPERIOR -->
+  <div class="flex items-center justify-between mb-3 text-sm text-gray-600">
+    <div *ngIf="!loading && tenants.length">
+      Mostrando <span class="font-semibold text-cyan-700">{{ tenants.length }}</span>
+      tenant{{ tenants.length === 1 ? '' : 's' }} registrados.
+    </div>
+    <div *ngIf="!loading && !tenants.length">
+      No hay tenants registrados aún.
+    </div>
+    <div *ngIf="loading">
+      <span class="text-cyan-600 flex items-center gap-1">
+        <mat-icon class="animate-spin !text-cyan-600 !text-base">autorenew</mat-icon>
+        Cargando tenants...
+      </span>
+    </div>
+  </div>
+
+  <!-- LISTADO -->
+  <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm bg-white">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+        <tr>
+          <th class="p-3 text-left">Nombre</th>
+          <th class="p-3 text-left">Dominio</th>
+          <th class="p-3 text-left">Usuarios</th>
+          <th class="p-3 text-left">Sucursales</th>
+          <th class="p-3 text-left">Creado el</th>
+          <th class="p-3 text-right">Acciones</th>
+        </tr>
+      </thead>
+
+      <tbody *ngIf="!loading; else skeleton">
+        <tr
+          *ngFor="let t of tenants; trackBy: trackById"
+          class="border-t hover:bg-gray-50 transition"
+        >
+          <td class="p-3 font-medium text-gray-700">{{ t.nombre }}</td>
+          <td class="p-3 text-gray-600">{{ t.dominio }}</td>
+          <td class="p-3 text-gray-600">{{ t.usuarios ?? 0 }}</td>
+          <td class="p-3 text-gray-600">{{ t.sucursales ?? 0 }}</td>
+          <td class="p-3 text-gray-500">
+            {{ t.creadoEl | date: 'mediumDate' }}
+          </td>
+          <td class="p-3 text-right">
+            <div class="inline-flex items-center gap-1">
+              <button
+                mat-icon-button
+                (click)="verDetalle(t)"
+                aria-label="Ver detalle"
+              >
+                <mat-icon color="primary">visibility</mat-icon>
+              </button>
+              <button
+                mat-icon-button
+                (click)="editarTenant(t)"
+                aria-label="Editar"
+              >
+                <mat-icon color="accent">edit</mat-icon>
+              </button>
+              <button
+                mat-icon-button
+                (click)="eliminarTenant(t)"
+                aria-label="Eliminar"
+              >
+                <mat-icon color="warn">delete</mat-icon>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Skeleton loader -->
+    <ng-template #skeleton>
+      <div class="skeleton-container">
+        <div class="skeleton-row" *ngFor="let _ of [1, 2, 3, 4, 5]">
+          <div class="skeleton-cell w-[25%]"></div>
+          <div class="skeleton-cell w-[25%]"></div>
+          <div class="skeleton-cell w-[15%]"></div>
+          <div class="skeleton-cell w-[15%]"></div>
+          <div class="skeleton-cell w-[15%]"></div>
+        </div>
+      </div>
+    </ng-template>
+  </div>
+</div>

@@ -1,0 +1,129 @@
+/* Transiciones suaves */
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Tarjetas y tabla */
+mat-card {
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  transition: box-shadow 0.2s ease;
+}
+
+mat-card:hover {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+}
+
+/* Tabla */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #fff;
+}
+
+th {
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+td, th {
+  padding: 0.75rem;
+}
+
+tr {
+  transition: background-color 0.15s ease;
+}
+
+/* Botones */
+button[mat-raised-button] {
+  background-color: #06b6d4;
+  color: #fff;
+}
+
+button[mat-raised-button]:hover {
+  background-color: #0891b2;
+}
+
+/* Skeleton loader */
+.skeleton-container {
+  padding: 16px;
+}
+
+.skeleton-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.skeleton-cell {
+  height: 18px;
+  border-radius: 6px;
+  background: linear-gradient(
+    100deg,
+    #e5e7eb 30%,
+    #f3f4f6 50%,
+    #e5e7eb 70%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Ajuste responsivo */
+@media (max-width: 768px) {
+  .skeleton-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .skeleton-cell {
+    width: 100% !important;
+  }
+}
+
+/* Contador superior */
+.text-cyan-700 {
+  color: #0e7490 !important;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Menú contextual */
+mat-icon[color="warn"] {
+  color: #dc2626 !important;
+}
+
+mat-icon[color="primary"] {
+  color: #0284c7 !important;
+}
+
+mat-icon[color="accent"] {
+  color: #059669 !important;
+}
