@@ -1,0 +1,190 @@
+/* === TAILWIND BASE === */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === LAYER COMPONENTS === */
+@layer components {
+  /* Contenedor base */
+  .container {
+    @apply mx-auto max-w-7xl px-4;
+  }
+
+  /* Tarjetas y botones */
+  .card {
+    @apply bg-white rounded-2xl shadow border border-gray-100;
+  }
+
+  .btn {
+    @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 font-medium transition-all;
+  }
+  .btn-primary {
+    @apply bg-cyan-500 text-white hover:bg-cyan-700;
+  }
+
+  /* Enlaces */
+  .link {
+    @apply text-cyan-600 underline hover:text-cyan-700;
+  }
+
+  /* Entradas modernas */
+  .modern-input {
+    @apply border border-cyan-400/60 rounded-lg px-3 py-2 bg-gray-50 text-gray-800 
+           focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-500 
+           shadow-inner transition duration-200;
+  }
+  .modern-input:hover {
+    @apply border-cyan-500 shadow-md bg-white;
+  }
+
+  /* KPIs */
+  .kpi-card {
+    @apply bg-white p-5 rounded-2xl shadow-md border border-cyan-100 
+           hover:shadow-lg hover:-translate-y-1 transition-all duration-300 
+           group min-w-[260px];
+  }
+
+  /* Chips y etiquetas */
+  .chip {
+    @apply inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs
+           bg-cyan-50 text-cyan-700 border border-cyan-400;
+  }
+
+  .pill {
+    @apply inline-block rounded px-2 py-0.5 bg-gray-50 border border-gray-200 text-xs;
+  }
+
+  /* Estados */
+  .status-badge {
+    @apply inline-flex items-center rounded-full border;
+  }
+  .status-dot {
+    @apply rounded-full;
+  }
+
+  /* Tabla moderna */
+  .table-wrapper {
+    @apply rounded-xl border border-gray-200 overflow-hidden;
+  }
+  .modern-table {
+    @apply w-full border-collapse;
+  }
+  .modern-table thead tr {
+    @apply bg-gradient-to-r from-cyan-50 to-blue-50;
+  }
+  .modern-table th {
+    @apply px-4 py-3 text-gray-700 uppercase tracking-wider border-b border-cyan-400/30 text-center;
+  }
+  .modern-table td {
+    @apply px-4 py-3 border-b border-gray-200 text-center;
+  }
+  .modern-table tbody tr:hover {
+    @apply bg-cyan-50/50;
+  }
+
+  /* Grid responsivo */
+  .responsive-grid {
+    @apply grid justify-center justify-items-center gap-4;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  @media (min-width: 640px) {
+    .responsive-grid {
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .responsive-grid {
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 1.5rem;
+    }
+  }
+  @media (min-width: 1280px) {
+    .responsive-grid {
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    }
+  }
+
+  .grid-item {
+    width: min(100%, 500px);
+    @apply justify-self-center;
+  }
+
+  /* Observaciones */
+  .observations-content {
+    @apply flex items-start p-4 bg-cyan-50 rounded-lg border border-cyan-400;
+  }
+  .observations-text {
+    @apply text-gray-700 whitespace-pre-line leading-relaxed flex-1;
+  }
+
+  /* Estados vacíos */
+  .empty-state,
+  .empty-table,
+  .empty-content {
+    @apply flex items-center justify-center text-gray-500 py-6;
+  }
+
+  .empty-state mat-icon,
+  .empty-table mat-icon,
+  .empty-content mat-icon {
+    @apply text-gray-400;
+  }
+
+  /* Scroll */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Modales */
+  .modal-container {
+    width: 95vw;
+    max-width: 1400px;
+  }
+}
+
+/* === GLOBAL === */
+html,
+body {
+  height: 100%;
+}
+body {
+  @apply m-0 overflow-hidden font-sans;
+  font-family: Inter, system-ui, -apple-system, Roboto, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* === MATERIAL === */
+.mdc-list-item.active {
+  @apply bg-gray-100;
+}
+.mdc-list-item a {
+  text-decoration: none;
+}
+
+/* === SNACKBAR === */
+.snackbar-success {
+  background-color: #10b981 !important;
+  color: white !important;
+}
+.snackbar-error {
+  background-color: #ef4444 !important;
+  color: white !important;
+  white-space: pre-wrap;
+  max-width: 500px !important;
+}
+.snackbar-info {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+/* === DIALOGOS === */
+::ng-deep .mat-mdc-dialog-container.historial-dialog .mdc-dialog__surface {
+  border-radius: 1rem;
+  border: 2px solid #06b6d4;
+  box-shadow: 0 4px 30px rgba(6, 182, 212, 0.2);
+}

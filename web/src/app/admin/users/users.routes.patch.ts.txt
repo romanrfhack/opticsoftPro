@@ -1,0 +1,4 @@
+// Add to your app.routes.ts
+import { roleGuard } from '../../auth/role.guard';
+
+{ path: 'admin/usuarios', canMatch: [roleGuard(['Admin'])], loadComponent: () => import('./users/users.page').then(m => m.UsersPage) },

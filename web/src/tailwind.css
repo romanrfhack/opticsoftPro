@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+/* === Estilos base globales con modo oscuro automático === */
+@layer base {
+  html, body {
+    height: 100%;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    transition: background-color 0.4s ease, color 0.4s ease;
+  }
+
+  body {
+    color: rgb(31 41 55); /* gray-800 */
+    background-color: rgb(255 255 255);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body {
+      color: rgb(243 244 246); /* gray-100 */
+      background-color: rgb(15 23 42); /* slate-900 */
+    }
+  }
+}
+
+/* === Componentes Opticsoft === */
+@layer components {
+  /* ---- Contenedor general ---- */
+  .container {
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    max-width: 80rem;
+  }
+
+  /* ---- Tarjetas (modo claro/oscuro) ---- */
+  .card {
+    background-color: rgb(255 255 255 / 0.9);
+    border-radius: 1rem;
+    border: 1px solid rgb(229 231 235 / 0.6);
+    box-shadow: 0 4px 20px rgb(0 0 0 / 0.05);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .card {
+      background-color: rgb(30 41 59 / 0.7);
+      border-color: rgb(255 255 255 / 0.15);
+      box-shadow: 0 6px 25px rgb(0 0 0 / 0.4);
+    }
+  }
+
+  /* ---- Efecto Glass ---- */
+  .glass-card {
+    background-color: rgb(255 255 255 / 0.1);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgb(255 255 255 / 0.25);
+    border-radius: 1rem;
+    box-shadow: 0 8px 40px rgb(0 0 0 / 0.25);
+    transition: all 0.4s ease;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .glass-card {
+      background-color: rgb(255 255 255 / 0.05);
+      border-color: rgb(255 255 255 / 0.15);
+      box-shadow: 0 8px 40px rgb(6 182 212 / 0.15);
+    }
+  }
+
+  /* ---- Input moderno ---- */
+  .input-modern {
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(209 213 219);
+    background-color: rgb(255 255 255 / 0.8);
+    color: rgb(17 24 39);
+    padding: 0.5rem 1rem 0.5rem 2.5rem;
+    transition: all 0.2s ease;
+  }
+
+  .input-modern::placeholder {
+    color: rgb(156 163 175);
+  }
+
+  .input-modern:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(6 182 212 / 0.7);
+    border-color: rgb(6 182 212);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .input-modern {
+      background-color: rgb(30 41 59 / 0.7);
+      color: rgb(243 244 246);
+      border-color: rgb(255 255 255 / 0.2);
+    }
+
+    .input-modern::placeholder {
+      color: rgb(148 163 184);
+    }
+
+    .input-modern:focus {
+      box-shadow: 0 0 0 2px rgb(6 182 212 / 0.7);
+      border-color: rgb(6 182 212);
+    }
+  }
+
+  /* ---- Botón con gradiente ---- */
+  .btn-gradient {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    color: white;
+    background-image: linear-gradient(to right, rgb(37 99 235), rgb(6 182 212));
+    box-shadow: 0 4px 20px rgb(6 182 212 / 0.3);
+    transition: all 0.3s ease;
+  }
+
+  .btn-gradient:hover {
+    box-shadow: 0 8px 25px rgb(6 182 212 / 0.4);
+    transform: translateY(-2px);
+  }
+
+  .btn-gradient:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .btn-gradient {
+      background-image: linear-gradient(to right, rgb(56 189 248), rgb(34 211 238));
+      box-shadow: 0 4px 20px rgb(34 211 238 / 0.25);
+    }
+  }
+}

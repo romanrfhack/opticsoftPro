@@ -1,0 +1,175 @@
+<!-- Filtros -->
+<!-- Filtros -->
+<div class="bg-white rounded-2xl shadow p-5 mb-6 border border-cyan-100">
+  <form [formGroup]="filterForm" class="flex flex-wrap items-end gap-6">
+    
+    <!-- Período -->
+    <div class="flex flex-col w-52">
+      <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-1">
+        <span class="material-icons text-cyan-500 text-base">schedule</span>
+        Período:
+      </label>
+      <select
+        formControlName="period"
+        class="modern-input"
+      >
+        <option *ngFor="let p of periods" [value]="p.value">{{ p.label }}</option>
+      </select>
+    </div>
+
+    <!-- Fechas personalizadas -->
+    <div *ngIf="filterForm.get('period')?.value === 'custom'" class="flex items-end gap-4">
+      <div class="flex flex-col w-44">
+        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-1">
+          <span class="material-icons text-cyan-500 text-base">calendar_today</span>
+          Desde:
+        </label>
+        <input type="date" formControlName="startDate" class="modern-input" />
+      </div>
+
+      <div class="flex flex-col w-44">
+        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-1">
+          <span class="material-icons text-cyan-500 text-base">calendar_month</span>
+          Hasta:
+        </label>
+        <input type="date" formControlName="endDate" class="modern-input" />
+      </div>
+    </div>
+
+    <!-- Sucursal -->
+    <div class="flex flex-col w-64">
+      <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-1">
+        <span class="material-icons text-cyan-500 text-base">store</span>
+        Sucursal:
+      </label>
+      <select
+        formControlName="branchId"
+        class="modern-input"
+      >
+        <option *ngFor="let branch of branches()" [value]="branch.id">{{ branch.nombre }}</option>
+      </select>
+    </div>
+  </form>
+</div>
+
+<!-- Loading -->
+<div *ngIf="loading()" class="flex justify-center items-center py-10 text-gray-500">
+  <span class="material-icons animate-spin mr-2">refresh</span>
+  Cargando datos del dashboard...
+</div>
+
+<!-- KPI -->
+<div *ngIf="!loading()" class="grid gap-4 p-5 grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
+
+  <div
+  *ngFor="let kpi of kpis()"
+    class="bg-white p-5 rounded-2xl shadow-md border border-cyan-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group min-w-[260px]"
+>
+  <!-- Título -->
+  <div class="flex items-center justify-between mb-3 border-b border-cyan-50 pb-2">
+    <h4 class="text-sm font-semibold text-cyan-700 tracking-wide uppercase">
+      {{ kpi.title }}
+    </h4>
+    <span
+      class="material-icons text-cyan-400 text-lg opacity-80 group-hover:opacity-100 transition"
+    >
+      {{ kpi.icon }}
+    </span>
+  </div>
+
+  <!-- Contenido principal -->
+  <div class="flex items-center justify-between mt-3">
+    <!-- Icono circular -->
+    <div
+      class="p-4 rounded-full shadow-md text-white transition transform group-hover:scale-105"
+      [ngClass]="{
+        'bg-blue-500': kpi.iconColor === 'blue',
+        'bg-green-500': kpi.iconColor === 'green',
+        'bg-cyan-500': kpi.iconColor === 'cyan',
+        'bg-yellow-500': kpi.iconColor === 'yellow',
+        'bg-red-500': kpi.iconColor === 'red'
+      }"
+    >
+      <span class="material-icons text-3xl">{{ kpi.icon }}</span>
+    </div>
+
+    <!-- Datos -->
+    <div class="text-right">
+      <div class="text-3xl font-bold text-gray-800 leading-tight">
+        {{ kpi.isMoney ? ('$' + (kpi.value | number:'1.0-2')) : (kpi.value | number) }}
+      </div>
+      <div class="text-xs mt-1">
+        <span
+          [ngClass]="{
+            'text-green-500 font-semibold': kpi.change > 0,
+            'text-red-500 font-semibold': kpi.change < 0,
+            'text-yellow-500 font-semibold': kpi.change === 0
+          }"
+        >
+          {{ kpi.change | number : '1.1-1' }}%
+        </span>
+        <span class="text-gray-400 ml-1">vs período anterior</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- Charts -->
+<div *ngIf="!loading()" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+  <!-- Pacientes -->
+  <div class="bg-white rounded-2xl shadow p-5 hover:-translate-y-1 transition-all duration-300 group" *ngIf="patientsChart()">
+    <h3 class="text-lg font-bold text-cyan-600">Pacientes Atendidos</h3>
+    <p class="text-sm text-gray-500 mb-3">Total vs Nuevos</p>
+    <apx-chart
+      [series]="patientsChart()?.series"
+      [chart]="patientsChart()?.chart"
+      [xaxis]="patientsChart()?.xaxis"
+      [dataLabels]="patientsChart()?.dataLabels"
+      [plotOptions]="patientsChart()?.plotOptions"
+      [colors]="patientsChart()?.colors"
+      [grid]="patientsChart()?.grid"
+    ></apx-chart>
+  </div>
+
+  <!-- Métodos de Pago -->
+  <div class="bg-white rounded-2xl shadow p-5 hover:-translate-y-1 transition-all duration-300 group" *ngIf="paymentsChart()">
+    <h3 class="text-lg font-bold text-cyan-600">Métodos de Pago</h3>
+    <p class="text-sm text-gray-500 mb-3">Distribución por tipo</p>
+    <apx-chart
+      [series]="paymentsChart()?.series"
+      [chart]="paymentsChart()?.chart"
+      [labels]="paymentsChart()?.labels"
+      [colors]="paymentsChart()?.colors"
+      [legend]="paymentsChart()?.legend"
+    ></apx-chart>
+  </div>
+
+  <!-- Estados de Órdenes -->
+  <div class="bg-white rounded-2xl shadow p-5 hover:-translate-y-1 transition-all duration-300 group" *ngIf="ordersChart()">
+    <h3 class="text-lg font-bold text-cyan-600">Estados de Órdenes</h3>
+    <p class="text-sm text-gray-500 mb-3">Distribución actual</p>
+    <apx-chart
+      [series]="ordersChart()?.series"
+      [chart]="ordersChart()?.chart"
+      [labels]="ordersChart()?.labels"
+      [colors]="ordersChart()?.colors"
+      [legend]="ordersChart()?.legend"
+    ></apx-chart>
+  </div>
+
+  <!-- Ventas por Categoría -->
+  <div class="bg-white rounded-2xl shadow p-5 hover:-translate-y-1 transition-all duration-300 group  " *ngIf="salesChart()">
+    <h3 class="text-lg font-bold text-cyan-600">Ventas por Categoría</h3>
+    <p class="text-sm text-gray-500 mb-3">Este periodo</p>
+    <apx-chart
+      [series]="salesChart()?.series"
+      [chart]="salesChart()?.chart"
+      [xaxis]="salesChart()?.xaxis"
+      [plotOptions]="salesChart()?.plotOptions"
+      [colors]="salesChart()?.colors"
+      [dataLabels]="salesChart()?.dataLabels"
+    ></apx-chart>
+  </div>
+</div>

@@ -1,0 +1,144 @@
+<div class="max-w-7xl mx-auto space-y-8 p-4 dashboard-container">
+  
+  <mat-progress-bar mode="indeterminate" *ngIf="loading()" class="rounded-full"></mat-progress-bar>
+  <mat-progress-bar mode="indeterminate" *ngIf="cargandoPacienteDesdeUrl()" class="rounded-full bg-blue-500"></mat-progress-bar>
+  <div *ngIf="cargandoPacienteDesdeUrl()" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+  <div class="flex items-center gap-3">  <mat-spinner diameter="24"></mat-spinner> <span class="text-blue-700 font-medium">Cargando paciente...</span> </div>
+</div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Col 1-2: Formulario principal -->
+    <div class="lg:col-span-2 space-y-8">
+      
+      <!-- Paciente Section -->
+      <app-paciente-form
+        *ngIf="!pacienteId()"
+        [pacForm]="pacForm"
+        [sugeridos]="sugeridos()"
+        (selectPaciente)="selectPaciente($event)"
+        (crearPaciente)="crearPaciente()">
+      </app-paciente-form>
+
+      <!-- Tarjeta compacta del paciente -->
+      <app-paciente-card
+        *ngIf="pacienteId()"
+        [pacForm]="pacForm"
+        (editarPaciente)="editarPaciente()">
+      </app-paciente-card>
+
+      <!-- Resto del formulario -->
+      <div *ngIf="pacienteId()" class="space-y-8">
+        <!-- Agudeza Visual -->
+        <app-agudeza-visual
+          [(avSinOD)]="avSinOD"
+          [(avSinOI)]="avSinOI"
+          [(avConOD)]="avConOD"
+          [(avConOI)]="avConOI">
+        </app-agudeza-visual>
+
+        <!-- RX Section -->
+        <app-rx-form [filasRx]="filasRx"></app-rx-form>
+
+        <!-- Materiales Section -->        
+        <app-materiales-form
+          [materiales]="materiales()"
+          [materialesSel]="materialesSel()"
+          (agregarMaterial)="agregarMaterial($event)"
+          (quitarMaterial)="quitarMaterial($event)"
+          [(materialSelId)]="materialSelId"
+          [(materialObs)]="materialObs"
+          (armazonesChange)="onArmazonesChange($event)"
+          (lentesContactoChange)="onLentesContactoChange($event)"> <!-- NUEVO OUTPUT -->
+        </app-materiales-form>        
+
+                
+        <!-- Observaciones y Total a Cobrar -->
+        <mat-card class="form-card">          
+          <mat-card-content class="space-y-6">                        
+            <!-- Campo de observaciones existente -->
+            <mat-form-field appearance="fill" class="w-full custom-form-field">
+              <mat-label>Observaciones generales y notas del examen</mat-label>
+              <textarea rows="4" matInput [(ngModel)]="observaciones" 
+                        placeholder="Escribe aquí cualquier observación importante..."></textarea>
+              <mat-icon matPrefix class="prefix-icon">notes</mat-icon>
+            </mat-form-field>
+          </mat-card-content>
+        </mat-card>           
+
+        <!-- Botones de Acción -->
+        <mat-card class="form-card">
+          <mat-card-content>
+            <div class="flex gap-4">
+              <!-- Botón Guardar (se muestra cuando NO está guardado) -->
+              <button *ngIf="!visitaGuardada()" 
+                      mat-flat-button 
+                      color="primary" 
+                      (click)="guardarBorrador()" 
+                      [disabled]="!pacienteId()"
+                      class="save-button flex-1 py-3">
+                <mat-icon>save</mat-icon>
+                Guardar Visita
+              </button>
+              
+              <!-- Botón Nuevo (se muestra cuando SÍ está guardado) -->
+              <button *ngIf="visitaGuardada()" 
+                      mat-flat-button 
+                      color="accent" 
+                      (click)="nuevaVisita()"
+                      class="new-button flex-1 py-3">
+                <mat-icon>add</mat-icon>
+                Nueva Visita
+              </button>
+            </div>
+            
+            <!-- Estado del formulario (opcional, para debug) -->
+            <div class="bg-[#06b6d4] mt-4 p-3 bg-gray-50 rounded-lg" *ngIf="true"> 
+              <h4 class="font-medium text-sm text-gray-700 mb-2">Estado del formulario:</h4>
+              <div class="text-xs text-gray-600 space-y-1">
+                <div>Paciente: {{ pacienteId() ? 'Seleccionado' : 'No seleccionado' }}</div>
+                <div>Agudeza Visual: {{ (avSinOD || avSinOI || avConOD || avConOI) ? 'Capturada' : 'No capturada' }}</div>
+                <div>RX: {{ filasRx.length > 0 ? 'Configurada' : 'No configurada' }}</div>
+                <div>Materiales: {{ materialesSel().length }} seleccionados</div>
+                <div>Armazones: {{ armazonesSel.length }} seleccionados</div>
+                <div>Lentes Contacto: {{ lentesContactoSel.length }} seleccionados</div>
+                <div>Pagos: {{ pagosRegistrados().length }} registrados ({{ totalPagado | number:'1.2-2' }})</div>
+                <div>Estado: {{ visitaGuardada() ? 'Visita Guardada' : 'En Proceso' }}</div>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </div>
+
+    <!-- Col 3: Últimas visitas -->
+    <div class="space-y-8" *ngIf="pacienteId()">
+      <mat-card class="form-card">
+        <mat-card-header class="border-b border-gray-100 pb-4">
+          <mat-card-title class="flex items-center gap-2 text-lg font-semibold">
+            <mat-icon class="text-primary">history</mat-icon>
+            Historial del Paciente
+          </mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <app-ultimas-visitas [pacienteId]="pacienteId()"></app-ultimas-visitas>            
+        </mat-card-content>
+      </mat-card>
+      <!-- Estado del formulario (opcional, para debug) -->
+       <div class=" h-64 text-white p-4 sticky top-0 z-50">    
+            <div class="bg-[#06b6d4] mt-4 p-3 bg-gray-50 rounded-lg" *ngIf="true"> 
+              <h4 class="font-medium text-sm text-gray-700 mb-2">Estado del formulario:</h4>
+              <div class="text-xs text-gray-600 space-y-1">
+                <div>Paciente: {{ pacienteId() ? 'Seleccionado' : 'No seleccionado' }}</div>
+                <div>Agudeza Visual: {{ (avSinOD || avSinOI || avConOD || avConOI) ? 'Capturada' : 'No capturada' }}</div>
+                <div>RX: {{ filasRx.length > 0 ? 'Configurada' : 'No configurada' }}</div>
+                <div>Materiales: {{ materialesSel().length }} seleccionados</div>
+                <div>Armazones: {{ armazonesSel.length }} seleccionados</div>
+                <div>Lentes Contacto: {{ lentesContactoSel.length }} seleccionados</div>
+                <!-- Agregar esta línea -->
+                <div>Pagos: {{ pagosRegistrados().length }} registrados ({{ totalPagado | number:'1.2-2' }})</div>
+              </div>
+            </div>            
+        </div>
+    </div>        
+  </div>  
+</div>
