@@ -1,0 +1,13 @@
+namespace Opticsoft.Domain.Entities;
+
+public sealed class Inventario
+{
+    public Guid TenantId { get; set; }
+    public Guid Id { get; set; }
+    public Guid ProductoId { get; set; }
+    public Guid SucursalId { get; set; }
+    public int Stock { get; set; }
+    public int StockMin { get; set; }
+    public Producto Producto { get; set; } = null!;
+    public Sucursal Sucursal { get; set; } = null!;
+}

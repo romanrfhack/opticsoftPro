@@ -1,0 +1,116 @@
+name: 🚀 Deploy Opticsoft API to VPS
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: opticsoft-api-deploy
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: "8.0.x"
+  RUNTIME: "linux-x64"
+  CONFIGURATION: "Release"
+  PROJECT_PATH: "src/Opticsoft.Api/Opticsoft.Api.csproj"
+  PUBLISH_DIR: "publish"
+  SERVICE_NAME: "opticsoft-api.service"
+  LISTEN_URL: "http://127.0.0.1:5003"
+  HEALTH_PATH: "/health"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', '**/packages.lock.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore "${{ env.PROJECT_PATH }}"
+
+      - name: Publish (project, not solution)
+        run: |
+          dotnet publish "${{ env.PROJECT_PATH }}" \
+            -c "${{ env.CONFIGURATION }}" \
+            -r "${{ env.RUNTIME }}" \
+            --self-contained false \
+            -p:PublishTrimmed=false \
+            -o "${{ env.PUBLISH_DIR }}"
+
+      - name: Create tarball
+        run: |
+          tar -czf opticsoft_api_publish.tgz -C "${{ env.PUBLISH_DIR }}" .
+
+      - name: Upload tarball to VPS (/tmp)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          source: "opticsoft_api_publish.tgz"
+          target: "/tmp"
+
+      - name: Deploy on VPS (stop -> replace publish -> start)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -euo pipefail
+
+            DEPLOY_DIR="${{ secrets.OPTICSOFT_API_PUBLISH_PATH }}"
+            TGZ="/tmp/opticsoft_api_publish.tgz"
+
+            echo "==> Stopping service"
+            sudo systemctl stop "${{ env.SERVICE_NAME }}" || true
+
+            echo "==> Ensuring deploy dir exists: $DEPLOY_DIR"
+            sudo mkdir -p "$DEPLOY_DIR"
+
+            echo "==> Cleaning old publish contents"
+            # IMPORTANTE: solo limpia dentro de publish (no toca /var/www/opticsoft/api/keys)
+            sudo find "$DEPLOY_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} \;
+
+            echo "==> Extracting new publish"
+            sudo tar -xzf "$TGZ" -C "$DEPLOY_DIR"
+
+            echo "==> Setting permissions"
+            sudo chown -R www-data:www-data "$DEPLOY_DIR"
+            sudo find "$DEPLOY_DIR" -type d -exec chmod 755 {} \;
+            sudo find "$DEPLOY_DIR" -type f -exec chmod 644 {} \;
+
+            echo "==> Starting service"
+            sudo systemctl daemon-reload
+            sudo systemctl start "${{ env.SERVICE_NAME }}"
+
+            echo "==> Verifying service is active"
+            sudo systemctl is-active --quiet "${{ env.SERVICE_NAME }}"
+            sudo systemctl status "${{ env.SERVICE_NAME }}" --no-pager
+
+            echo "==> Health check (local)"
+            curl -fsS "${{ env.LISTEN_URL }}${{ env.HEALTH_PATH }}" | head -c 300 || true
+            echo
+
+      - name: Health check (public URL)
+        run: |
+          curl -fsS "${{ secrets.OPTICSOFT_API_PUBLIC_HEALTH_URL }}" | head -c 300
+          echo
