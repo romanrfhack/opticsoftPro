@@ -10,3 +10,5 @@ admin/.codex
 
 # Generated Tailwind output
 web/src/output.css
+
+/.codex
