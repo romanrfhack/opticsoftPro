@@ -4,3 +4,9 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Local tool config
+admin/.codex
+
+# Generated Tailwind output
+web/src/output.css
