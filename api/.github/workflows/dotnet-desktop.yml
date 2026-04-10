@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DOTNET_VERSION: "8.0.x"
+  DOTNET_VERSION: "10.0.x"
   RUNTIME: "linux-x64"
   CONFIGURATION: "Release"
   PROJECT_PATH: "src/Opticsoft.Api/Opticsoft.Api.csproj"
@@ -42,7 +42,7 @@ jobs:
             nuget-${{ runner.os }}-
 
       - name: Restore
-        run: dotnet restore "${{ env.PROJECT_PATH }}"
+        run: dotnet restore "${{ env.PROJECT_PATH }}" -r "${{ env.RUNTIME }}"
 
       - name: Publish (project, not solution)
         run: |
@@ -50,6 +50,7 @@ jobs:
             -c "${{ env.CONFIGURATION }}" \
             -r "${{ env.RUNTIME }}" \
             --self-contained false \
+            --no-restore \
             -p:PublishTrimmed=false \
             -o "${{ env.PUBLISH_DIR }}"
 

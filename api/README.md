@@ -1,4 +1,4 @@
-## Optica API (.NET 8 + EF Core + SQL Server)
+## Optica API (.NET 10 + EF Core + SQL Server)
 
 ### Pasos
 ```bash

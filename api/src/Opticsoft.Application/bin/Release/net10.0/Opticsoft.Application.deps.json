@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "Opticsoft.Application/1.0.0": {
+        "dependencies": {
+          "Opticsoft.Domain": "1.0.0"
+        },
+        "runtime": {
+          "Opticsoft.Application.dll": {}
+        }
+      },
+      "Opticsoft.Domain/1.0.0": {
+        "runtime": {
+          "Opticsoft.Domain.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Opticsoft.Application/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Opticsoft.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

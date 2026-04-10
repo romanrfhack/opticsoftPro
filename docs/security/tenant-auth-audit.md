@@ -10,7 +10,8 @@
 
 ## Hechos confirmados
 
-- El backend observado corre sobre .NET 8 y los frontends sobre Angular 20.
+- El backend observado en repo corre sobre .NET 10 y los frontends sobre Angular 20.
+- El backend fue alineado a .NET 10 en un mini sprint backend-only; ese cambio no altera el diagnóstico base de tenancy, auth/authz, branch context ni separación `web` vs `admin`.
 - El pipeline observable del API es `UseCors -> Swagger -> TenantMiddleware -> UseAuthentication -> UseAuthorization -> MapControllers` en `api/src/Opticsoft.Api/Program.cs`.
 - El JWT emite `sub`, `email`, `name`, `sucursalId`, `tenantId` y roles en `api/src/Opticsoft.Api/Auth/JwtTokenService.cs`.
 - `TenantMiddleware` sólo intenta resolver tenant si el usuario ya está autenticado, pero corre antes de `UseAuthentication`.
@@ -43,6 +44,8 @@
 
 - Si existe infraestructura externa que haga consistente `UsePathBase("/api")` con las rutas efectivas consumidas por `web` y `admin`.
 - Si existen secretos externos o configuración productiva que mitiguen los defaults visibles en repo.
+- Si el VPS de despliegue ya dispone de `Microsoft.AspNetCore.App 10.x` para el backend actualizado.
+- Si ya se ejecutó un smoke real de arranque post-upgrade del backend sobre .NET 10 en entorno de despliegue.
 - Si hay observabilidad, alertado o auditoría operativa fuera del repositorio.
 - Si existe un catálogo de permisos/capacidades más preciso que el uso observable de roles por string.
 - Si existe un workflow activo del monorepo en `.github/workflows` de raíz.

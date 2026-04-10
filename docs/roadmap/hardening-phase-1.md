@@ -4,6 +4,13 @@
 
 Estabilizar la base técnica mínima para que Opticsoft deje de operar como piloto controlado con enforcement débil y pueda avanzar hacia una base SaaS más segura, gobernable y repetible, sin refactor masivo ni expansión funcional.
 
+## Nota operativa actual
+
+- El backend del repo ya fue alineado a .NET 10 en un mini sprint backend-only.
+- `web` y `admin` no formaron parte de ese sprint y siguen fuera de cualquier supuesto de Angular 21.
+- Ese upgrade no cambia el alcance, la prioridad ni el orden de ejecución del hardening fase 1.
+- Si el runtime `Microsoft.AspNetCore.App 10.x` en VPS o el smoke real de arranque post-upgrade siguen sin confirmarse, deben tratarse como pendiente por validar y no como cierre del hardening.
+
 ## Alcance exacto
 
 - Endurecer enforcement de tenant por request y por persistencia en flujos críticos.

@@ -5,9 +5,11 @@
 - Sistema: Opticsoft.
 - Propósito actual: sistema para operación de ópticas con módulos de autenticación, usuarios, sucursales, pacientes, historias clínicas, órdenes/pagos, inventario, dashboard, soporte y administración global básica.
 - Stack observado en repo:
-  - Backend: .NET 8 en `api/src/Opticsoft.Api/Opticsoft.Api.csproj`.
+  - Backend: .NET 10 en `api/src/Opticsoft.Api/Opticsoft.Api.csproj`.
   - Frontends: Angular 20 en `web/package.json` y `admin/package.json`.
   - Base de datos: SQL Server.
+- El backend fue alineado a .NET 10 en un mini sprint backend-only a nivel de código y base de build.
+- `web` y `admin` no formaron parte de ese mini sprint y no se asume Angular 21.
 - Clasificación actual: producto en formación con operación tipo piloto controlado.
 - Veredicto técnico actual: no está listo como SaaS B2B serio ni como plataforma multi-tenant endurecida.
 - Bloqueadores activos:
@@ -38,6 +40,7 @@
 - Documentos canónicos relacionados:
   - `docs/security/tenant-auth-audit.md`
   - `docs/roadmap/hardening-phase-1.md`
+  - `docs/roadmap/hardening-phase-1-backlog.md`
 
 ## Inferencia razonable
 
@@ -50,6 +53,8 @@
 - Si existe gobernanza CI/CD real del monorepo desde `.github/workflows` en raíz. Hay evidencia parcial y sigue pendiente por validar; no está confirmado desde raíz del monorepo.
 - Si el despliegue productivo usa secretos externos que mitiguen los defaults visibles en repo.
 - Si existe infraestructura externa que resuelva de forma consistente `PathBase`, proxy y contexto de tenant/sucursal.
+- Si el VPS de despliegue ya dispone de `Microsoft.AspNetCore.App 10.x` para el backend actualizado.
+- Si ya se ejecutó un smoke real de arranque post-upgrade del backend sobre .NET 10 en entorno de despliegue.
 - Si existe observabilidad operativa fuera del repositorio.
 
 ## Siguiente acción recomendada
