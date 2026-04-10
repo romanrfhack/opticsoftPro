@@ -15,9 +15,22 @@ using Opticsoft.Infrastructure.Persistence;
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+
 const string CorsLocal = "CorsLocal";
 const string CorsProd = "CorsProd";
+const string RequiredConfigPlaceholderPrefix = "__REQUIRED__:";
+const string MissingSqlServerConnectionStringMessage =
+    "Missing required configuration 'ConnectionStrings:SqlServer'. Configure a real connection string outside the repo, for example via 'ConnectionStrings__SqlServer'.";
+const string MissingJwtKeyMessage =
+    "Missing required configuration 'Jwt:Key'. Configure a real signing key outside the repo, for example via 'Jwt__Key'.";
+const string MissingBootstrapAdminPasswordMessage =
+    "Missing required configuration 'BootstrapAdmin:Password' for bootstrap admin seeding. Configure a one-time password outside the repo, for example via 'BootstrapAdmin__Password', before starting against an empty database.";
+
 var builder = WebApplication.CreateBuilder(args);
+
+EnsureRequiredConfiguration(builder.Configuration, "ConnectionStrings:SqlServer", MissingSqlServerConnectionStringMessage);
+EnsureRequiredConfiguration(builder.Configuration, "Jwt:Key", MissingJwtKeyMessage);
+
 builder.Services.AddInfrastructure(builder.Configuration);
 JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 builder.Services
@@ -48,6 +61,7 @@ builder.Services.AddCors(opts =>
 });
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()!;
+jwt.Key = EnsureRequiredConfiguration(builder.Configuration, "Jwt:Key", MissingJwtKeyMessage);
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
@@ -103,7 +117,7 @@ using (var scope = app.Services.CreateScope())
     var db = sp.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
     if (!await db.Users.AnyAsync())
-        await SeedData(sp);
+        await SeedData(sp, builder.Configuration);
 }
 
 app.UseCors(app.Environment.IsDevelopment() ? CorsLocal : CorsProd);
@@ -115,7 +129,7 @@ app.UseAuthorization();
 app.MapControllers();
 app.Run();
 
-static async Task SeedData(IServiceProvider sp)
+static async Task SeedData(IServiceProvider sp, IConfiguration configuration)
 {
     var db = sp.GetRequiredService<AppDbContext>();
     if (!await db.Tenants.AnyAsync())
@@ -142,6 +156,11 @@ static async Task SeedData(IServiceProvider sp)
     var admin = await userMgr.FindByEmailAsync(adminEmail);
     if (admin is null)
     {
+        var bootstrapAdminPassword = EnsureRequiredConfiguration(
+            configuration,
+            "BootstrapAdmin:Password",
+            MissingBootstrapAdminPasswordMessage);
+
         admin = new AppUser
         {
             Id = Guid.NewGuid(),
@@ -151,8 +170,17 @@ static async Task SeedData(IServiceProvider sp)
             FullName = "Administrador General",
             TenantId = Guid.Parse("00000000-0000-0000-0000-000000000001")
         };
-        var result = await userMgr.CreateAsync(admin, "Admin123!");
+        var result = await userMgr.CreateAsync(admin, bootstrapAdminPassword);
         if (result.Succeeded)
             await userMgr.AddToRoleAsync(admin, "Admin");
     }
+}
+
+static string EnsureRequiredConfiguration(IConfiguration configuration, string key, string errorMessage)
+{
+    var value = configuration[key];
+    if (string.IsNullOrWhiteSpace(value) || value.StartsWith(RequiredConfigPlaceholderPrefix, StringComparison.Ordinal))
+        throw new InvalidOperationException(errorMessage);
+
+    return value;
 }

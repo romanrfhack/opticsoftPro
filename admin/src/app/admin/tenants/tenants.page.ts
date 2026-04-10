@@ -40,7 +40,7 @@ export class TenantsPage implements OnInit {
     dominio: ['', [Validators.required, Validators.maxLength(150)]],
     adminNombre: ['', [Validators.required, Validators.maxLength(150)]],
     adminEmail: ['', [Validators.required, Validators.email]],
-    adminPassword: ['Admin123!', [Validators.required, Validators.minLength(6)]]
+    adminPassword: ['', [Validators.required, Validators.minLength(6)]]
   });
 
   ngOnInit() {
@@ -88,7 +88,7 @@ export class TenantsPage implements OnInit {
         next: (t) => {
           this.tenants = [t, ...this.tenants];
           this.toast.ok(`✅ Tenant "${t.nombre}" creado correctamente`);
-          this.form.reset({ adminPassword: 'Admin123!' });
+          this.form.reset({ adminPassword: '' });
           this.showForm = false;
         },
         error: (err) => {

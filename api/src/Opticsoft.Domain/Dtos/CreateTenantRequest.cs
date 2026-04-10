@@ -23,6 +23,6 @@ namespace Opticsoft.Domain.Dtos
         public string AdminNombre { get; set; } = default!;
 
         [Required, MinLength(6)]
-        public string AdminPassword { get; set; } = "Admin123!"; // Default temporal
+        public string AdminPassword { get; set; } = default!;
     }
 }
