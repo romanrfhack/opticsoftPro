@@ -2,19 +2,25 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
+using Opticsoft.Application.Common.Interfaces;
 using Opticsoft.Domain.Entities;
 using Opticsoft.Infrastructure.Identity;
 
-using System.Linq.Expressions;
-using System.Reflection.Emit;
-using Opticsoft.Application.Common.Interfaces;
+using System.Reflection;
 
 
 namespace Opticsoft.Infrastructure.Persistence;
 
 public sealed class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
 {
+    private const string TenantIdPropertyName = "TenantId";
+    private static readonly MethodInfo ApplyTenantQueryFilterMethod =
+        typeof(AppDbContext).GetMethod(nameof(ApplyTenantQueryFilter), BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException($"No se encontrÃ³ {nameof(ApplyTenantQueryFilter)}.");
+
     private readonly ITenantProvider? _tenantProvider;
+    private Guid? CurrentTenantId => _tenantProvider?.CurrentTenantId;
+    private bool HasAuthenticatedUser => _tenantProvider?.HasAuthenticatedUser == true;
 
     public AppDbContext(DbContextOptions<AppDbContext> options, ITenantProvider? tenantProvider = null)
         : base(options)
@@ -117,7 +123,7 @@ public sealed class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>
             cfg.ToTable("Pacientes");
             cfg.HasKey(x => x.Id);
 
-            // Relación con Sucursal (sin cascada)
+            // RelaciÃ³n con Sucursal (sin cascada)
             cfg.HasOne(p => p.SucursalAlta)
                .WithMany()
                .HasForeignKey(p => p.SucursalIdAlta)
@@ -128,7 +134,7 @@ public sealed class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>
             cfg.Property(x => x.Ocupacion).HasMaxLength(120);
             cfg.Property(x => x.Direccion).HasMaxLength(300);
 
-            // Auditoría
+            // AuditorÃ­a
             cfg.Property(x => x.CreadoPorUsuarioId);
             cfg.Property(x => x.CreadoPorNombre).HasMaxLength(200);
             cfg.Property(x => x.CreadoPorEmail).HasMaxLength(200);
@@ -146,7 +152,7 @@ public sealed class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>
                 .HasMaxLength(30)
                 .HasComputedColumnSql("LTRIM(RTRIM([Telefono]))", stored: true);
 
-            // Índice único por nombre + teléfono
+            // Ãndice Ãºnico por nombre + telÃ©fono
             cfg.HasIndex(x => new { x.NombreNormalized, x.TelefonoNormalized })
                 .IsUnique()
                 .HasFilter("[Nombre] IS NOT NULL AND [Telefono] IS NOT NULL AND [Telefono] <> ''");
@@ -158,19 +164,19 @@ public sealed class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>
             cfg.ToTable("Visitas");
             cfg.HasKey(x => x.Id);
 
-            // Relación con Sucursal (sin cascada)
+            // RelaciÃ³n con Sucursal (sin cascada)
             cfg.HasOne(v => v.Sucursal)
                .WithMany()
                .HasForeignKey(v => v.SucursalId)
                .OnDelete(DeleteBehavior.Restrict);
 
-            // Relación con Paciente (sin cascada)
+            // RelaciÃ³n con Paciente (sin cascada)
             cfg.HasOne(v => v.Paciente)
                .WithMany(p => p.Visitas)
                .HasForeignKey(v => v.PacienteId)
                .OnDelete(DeleteBehavior.Restrict);
 
-            // Si tienes relación con Usuario (quien atendió), también sin cascada
+            // Si tienes relaciÃ³n con Usuario (quien atendiÃ³), tambiÃ©n sin cascada
             // cfg.HasOne(v => v.Usuario)
             //    .WithMany()
             //    .HasForeignKey(v => v.UsuarioId)
@@ -190,7 +196,7 @@ public sealed class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>
             e.Property(x => x.LabNombre).HasMaxLength(150);
             e.HasIndex(x => new { x.VisitaId, x.TimestampUtc });
 
-            //// Relación con Visita (sí puede tener cascada)
+            //// RelaciÃ³n con Visita (sÃ­ puede tener cascada)
             //e.HasOne(h => h.Visita)
             // .WithMany(v => v.StatusHistory)
             // .HasForeignKey(h => h.VisitaId)
@@ -224,37 +230,31 @@ public sealed class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>
         // ---------- MULTITENANT: agregar TenantId a todas las entidades ----------
         foreach (var entity in b.Model.GetEntityTypes())
         {
-            if (entity.FindProperty("TenantId") != null)
+            if (entity.FindProperty(TenantIdPropertyName) != null)
             {
                 b.Entity(entity.ClrType)
-                    .Property<Guid>("TenantId")
+                    .Property<Guid>(TenantIdPropertyName)
                     .IsRequired();
 
                 b.Entity(entity.ClrType)
-                    .HasIndex("TenantId");
+                    .HasIndex(TenantIdPropertyName);
 
             }
         }
 
         b.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
-        // ---------- MULTITENANT: Filtro Global ----------
-        if (_tenantProvider?.CurrentTenantId is Guid tenantId && tenantId != Guid.Empty)
+        // ---------- MULTITENANT: Filtro Global per-request ----------
+        foreach (var entityType in b.Model.GetEntityTypes())
         {
-            foreach (var entityType in b.Model.GetEntityTypes())
+            if (entityType.FindProperty(TenantIdPropertyName) == null)
             {
-                // Si la entidad tiene TenantId
-                if (entityType.FindProperty("TenantId") != null)
-                {
-                    var param = Expression.Parameter(entityType.ClrType, "e");
-                    var tenantProperty = Expression.Property(param, "TenantId");
-                    var tenantValue = Expression.Constant(tenantId);
-                    var eq = Expression.Equal(tenantProperty, tenantValue);
-                    var lambda = Expression.Lambda(eq, param);
-
-                    b.Entity(entityType.ClrType).HasQueryFilter(lambda);
-                }
+                continue;
             }
+
+            ApplyTenantQueryFilterMethod
+                .MakeGenericMethod(entityType.ClrType)
+                .Invoke(this, new object[] { b });
         }
 
     }
@@ -263,5 +263,13 @@ public sealed class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>
     {
         configurationBuilder.Properties<decimal>().HavePrecision(12, 2);
         configurationBuilder.Properties<decimal?>().HavePrecision(12, 2);
+    }
+
+    private void ApplyTenantQueryFilter<TEntity>(ModelBuilder builder)
+        where TEntity : class
+    {
+        builder.Entity<TEntity>().HasQueryFilter(entity =>
+            !HasAuthenticatedUser ||
+            (CurrentTenantId.HasValue && EF.Property<Guid>(entity, TenantIdPropertyName) == CurrentTenantId.Value));
     }
 }

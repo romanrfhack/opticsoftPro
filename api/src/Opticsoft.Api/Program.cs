@@ -123,8 +123,8 @@ using (var scope = app.Services.CreateScope())
 app.UseCors(app.Environment.IsDevelopment() ? CorsLocal : CorsProd);
 app.UseSwagger();
 app.UseSwaggerUI();
-app.UseMiddleware<TenantMiddleware>();
 app.UseAuthentication();
+app.UseMiddleware<TenantMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();

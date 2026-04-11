@@ -37,12 +37,11 @@ namespace Opticsoft.Api.MultiTenancy
                 return;
             }
 
-            // Solo aplicar si está autenticado
-            if (context.User?.Identity?.IsAuthenticated == true)
+            if (tenantProvider.HasAuthenticatedUser)
             {
-                await tenantProvider.ResolveTenantAsync();
+                var tenantId = await tenantProvider.ResolveTenantAsync();
 
-                if (tenantProvider.CurrentTenantId == null)
+                if (tenantId == null)
                 {
                     _logger.LogWarning("⚠️ Solicitud sin TenantId detectado. Ruta: {Path}", path);
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -50,7 +49,7 @@ namespace Opticsoft.Api.MultiTenancy
                     return;
                 }
 
-                _logger.LogInformation("✅ Tenant activo: {TenantId}", tenantProvider.CurrentTenantId);
+                _logger.LogInformation("✅ Tenant activo: {TenantId}", tenantId);
             }
 
             await _next(context);

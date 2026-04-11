@@ -3,6 +3,7 @@
     public interface ITenantProvider
     {
         Guid? CurrentTenantId { get; }
+        bool HasAuthenticatedUser { get; }
         Task<Guid?> ResolveTenantAsync();
     }
 }
