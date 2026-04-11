@@ -20,7 +20,9 @@ public sealed class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>
 
     private readonly ITenantProvider? _tenantProvider;
     private Guid? CurrentTenantId => _tenantProvider?.CurrentTenantId;
+    private Guid CurrentTenantIdOrDefault => _tenantProvider?.CurrentTenantId ?? Guid.Empty;
     private bool HasAuthenticatedUser => _tenantProvider?.HasAuthenticatedUser == true;
+    private bool HasResolvedTenant => CurrentTenantId.HasValue;
 
     public AppDbContext(DbContextOptions<AppDbContext> options, ITenantProvider? tenantProvider = null)
         : base(options)
@@ -268,8 +270,9 @@ public sealed class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>
     private void ApplyTenantQueryFilter<TEntity>(ModelBuilder builder)
         where TEntity : class
     {
+        // EF may evaluate query-filter parameters even when the boolean branch short-circuits.
         builder.Entity<TEntity>().HasQueryFilter(entity =>
             !HasAuthenticatedUser ||
-            (CurrentTenantId.HasValue && EF.Property<Guid>(entity, TenantIdPropertyName) == CurrentTenantId.Value));
+            (HasResolvedTenant && EF.Property<Guid>(entity, TenantIdPropertyName) == CurrentTenantIdOrDefault));
     }
 }
