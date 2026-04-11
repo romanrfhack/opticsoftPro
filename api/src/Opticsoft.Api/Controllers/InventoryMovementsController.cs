@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Opticsoft.Api.Auth;
 using Opticsoft.Domain.Entities;
 using Opticsoft.Domain.Enums;
 using Opticsoft.Infrastructure.Persistence;
@@ -18,6 +20,7 @@ public class InventoryMovementsController : ControllerBase
     public InventoryMovementsController(AppDbContext db) => _db = db;
 
     [HttpPost]
+    [Authorize(Policy = Policies.Inventario_Editar)]
     public async Task<IActionResult> Create(MovementCreateDto dto)
     {
         if (dto.Cantidad <= 0) return BadRequest(new { message = "Cantidad debe ser > 0" });

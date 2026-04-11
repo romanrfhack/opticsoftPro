@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Opticsoft.Api.Auth;
 using Opticsoft.Application.Productos.Dtos;
 using Opticsoft.Domain.Entities;
 using Opticsoft.Domain.Enums;
@@ -13,6 +15,7 @@ public sealed record ProductUpdateDto(string Sku, string Nombre, string Categori
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class ProductsController : ControllerBase
 {
     private readonly AppDbContext _db;
@@ -40,6 +43,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = Policies.Inventario_Editar)]
     public async Task<ActionResult<ProductDto>> Create(ProductCreateDto dto)
     {
         if (await _db.Productos.AnyAsync(x => x.Sku == dto.Sku))
@@ -55,6 +59,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = Policies.Inventario_Editar)]
     public async Task<ActionResult<ProductDto>> Update(Guid id, ProductUpdateDto dto)
     {
         var p = await _db.Productos.FindAsync(id);
@@ -76,6 +81,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Policies.Inventario_Editar)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var used = await _db.Inventarios.AnyAsync(i => i.ProductoId == id);
