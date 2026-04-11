@@ -47,7 +47,7 @@ export const routes: Routes = [
       { path: 'ordenes', canActivate: [authGuard],
         loadComponent: () => import('./features/ordenes/ordenes.page').then(m => m.CostosPageComponent)
       },
-      { path: 'admin/soporte', canActivate: [authGuard],
+      { path: 'admin/soporte', canMatch: [roleGuard(['Admin'])],
         loadComponent: () => import('./features/soporte/soporte-admin.component').then(m => m.SoporteAdminComponent)
       },
       { path: '**', loadComponent: () => import('./features/not-found/not-found.page').then(m => m.NotFoundPage) },

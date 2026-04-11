@@ -2,14 +2,17 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Opticsoft.Api.Auth;
 using Opticsoft.Infrastructure.Identity;
 using Opticsoft.Infrastructure.Persistence;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace Opticsoft.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-//[Authorize(Roles = "Admin")]
+[Authorize]
 public class UsersController : ControllerBase
 {
     private readonly UserManager<AppUser> _userManager;
@@ -30,10 +33,12 @@ public class UsersController : ControllerBase
     public sealed record LockRequest(bool Lock);
 
     [HttpGet("roles")]
+    [Authorize(Policy = Policies.Usuarios_Admin)]
     public async Task<IEnumerable<string>> Roles()
         => await _roleManager.Roles.Select(r => r.Name!).OrderBy(n => n).ToListAsync();
 
     [HttpGet]
+    [Authorize(Policy = Policies.Usuarios_Admin)]
     public async Task<ActionResult<object>> List([FromQuery] string? query, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
         if (page < 1) page = 1;
@@ -62,6 +67,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = Policies.Usuarios_Admin)]
     public async Task<ActionResult<UserItem>> Create(CreateUserRequest req)
     {
         foreach (var r in req.Roles)
@@ -91,6 +97,9 @@ public class UsersController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<UserItem>> GetById(Guid id)
     {
+        if (!CanAccessUser(id))
+            return Forbid();
+
         var u = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
         if (u is null) return NotFound();
         var roles = await _userManager.GetRolesAsync(u);
@@ -101,6 +110,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = Policies.Usuarios_Admin)]
     public async Task<IActionResult> Update(Guid id, UpdateUserRequest req)
     {
         var u = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
@@ -122,6 +132,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost("{id:guid}/reset-password")]
+    [Authorize(Policy = Policies.Usuarios_Admin)]
     public async Task<IActionResult> ResetPassword(Guid id, ResetPasswordRequest req)
     {
         var u = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
@@ -133,6 +144,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost("{id:guid}/lock")]
+    [Authorize(Policy = Policies.Usuarios_Admin)]
     public async Task<IActionResult> Lock(Guid id, LockRequest req)
     {
         var u = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
@@ -141,5 +153,17 @@ public class UsersController : ControllerBase
         else u.LockoutEnd = null;
         await _userManager.UpdateAsync(u);
         return NoContent();
+    }
+
+    private bool CanAccessUser(Guid userId)
+    {
+        if (User.IsInRole("Admin"))
+            return true;
+
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+            ?? User.FindFirstValue("sub");
+
+        return Guid.TryParse(currentUserId, out var currentUserGuid) && currentUserGuid == userId;
     }
 }

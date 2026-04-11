@@ -69,7 +69,7 @@ namespace Opticsoft.Api.Controllers
 
         // GET /api/soporte (admin)
         [HttpGet]
-        //[Authorize(Roles = "Admin")]
+        [Authorize(Policy = Opticsoft.Api.Auth.Policies.Usuarios_Admin)]
         public async Task<ActionResult<IEnumerable<SupportTicket>>> Listar(int take = 100)
         {
             var list = await _db.SupportTickets
