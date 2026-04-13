@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Opticsoft.Application.Common.Interfaces;
 using Opticsoft.Api.Auth;
 using Opticsoft.Infrastructure.Identity;
 using Opticsoft.Infrastructure.Persistence;
@@ -18,12 +19,18 @@ public class UsersController : ControllerBase
     private readonly UserManager<AppUser> _userManager;
     private readonly RoleManager<IdentityRole<Guid>> _roleManager;
     private readonly AppDbContext _db;
+    private readonly ITenantProvider _tenantProvider;
 
-    public UsersController(UserManager<AppUser> userManager, RoleManager<IdentityRole<Guid>> roleManager, AppDbContext db)
+    public UsersController(
+        UserManager<AppUser> userManager,
+        RoleManager<IdentityRole<Guid>> roleManager,
+        AppDbContext db,
+        ITenantProvider tenantProvider)
     {
         _userManager = userManager;
         _roleManager = roleManager;
         _db = db;
+        _tenantProvider = tenantProvider;
     }
 
     public sealed record UserItem(Guid Id, string Email, string? FullName, string? PhoneNumber, Guid SucursalId, string SucursalNombre, string[] Roles, bool LockedOut);
@@ -73,6 +80,15 @@ public class UsersController : ControllerBase
         foreach (var r in req.Roles)
             if (!await _roleManager.RoleExistsAsync(r)) return BadRequest(new { message = $"Rol inexistente: {r}" });
 
+        if (!TryGetCurrentTenantId(out var tenantId, out var tenantError))
+            return tenantError!;
+
+        var suc = await _db.Sucursales
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == req.SucursalId);
+        if (suc is null)
+            return BadRequest(new { message = "Sucursal invalida para el tenant actual." });
+
         var user = new AppUser
         {
             Id = Guid.NewGuid(),
@@ -80,7 +96,8 @@ public class UsersController : ControllerBase
             Email = req.Email,
             EmailConfirmed = true,
             FullName = req.FullName,
-            SucursalId = req.SucursalId
+            SucursalId = req.SucursalId,
+            TenantId = tenantId
         };
 
         var result = await _userManager.CreateAsync(user, req.Password);
@@ -89,7 +106,6 @@ public class UsersController : ControllerBase
         if (req.Roles.Length > 0)
             await _userManager.AddToRolesAsync(user, req.Roles);
 
-        var suc = await _db.Sucursales.FindAsync(req.SucursalId);
         var roles = await _userManager.GetRolesAsync(user);
         return CreatedAtAction(nameof(GetById), new { id = user.Id }, new UserItem(user.Id, user.Email!, user.FullName, user.PhoneNumber, user.SucursalId, suc?.Nombre ?? "", roles.ToArray(), false));
     }
@@ -113,8 +129,17 @@ public class UsersController : ControllerBase
     [Authorize(Policy = Policies.Usuarios_Admin)]
     public async Task<IActionResult> Update(Guid id, UpdateUserRequest req)
     {
+        if (!TryGetCurrentTenantId(out _, out var tenantError))
+            return tenantError!;
+
         var u = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
         if (u is null) return NotFound();
+
+        var suc = await _db.Sucursales
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == req.SucursalId);
+        if (suc is null)
+            return BadRequest(new { message = "Sucursal invalida para el tenant actual." });
 
         u.FullName = req.FullName;
         u.SucursalId = req.SucursalId;
@@ -165,5 +190,19 @@ public class UsersController : ControllerBase
             ?? User.FindFirstValue("sub");
 
         return Guid.TryParse(currentUserId, out var currentUserGuid) && currentUserGuid == userId;
+    }
+
+    private bool TryGetCurrentTenantId(out Guid tenantId, out ActionResult? errorResult)
+    {
+        tenantId = _tenantProvider.CurrentTenantId ?? Guid.Empty;
+
+        if (tenantId != Guid.Empty)
+        {
+            errorResult = null;
+            return true;
+        }
+
+        errorResult = Unauthorized(new { message = "Tenant no encontrado o token invalido." });
+        return false;
     }
 }

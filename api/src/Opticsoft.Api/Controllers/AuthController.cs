@@ -20,6 +20,7 @@ namespace Opticsoft.Api.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
+    private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(7);
     private readonly UserManager<AppUser> _userManager;
     private readonly SignInManager<AppUser> _signInManager;
     private readonly JwtTokenService _tokens;
@@ -43,6 +44,9 @@ public class AuthController : ControllerBase
         var ok = await _signInManager.CheckPasswordSignInAsync(user, req.Password, lockoutOnFailure: false);
         if (!ok.Succeeded) return Unauthorized();
 
+        if (!TryGetValidTenantId(user, out var tenantId))
+            return Unauthorized(new { message = "El usuario autenticado no tiene un TenantId valido." });
+
         // 🔹 Actualizar fecha de último inicio de sesión
         user.LastLoginAt = DateTime.UtcNow;
         await _userManager.UpdateAsync(user);
@@ -50,13 +54,7 @@ public class AuthController : ControllerBase
         var (access, exp) = await _tokens.CreateAccessTokenAsync(user);
         var refresh = JwtTokenService.GenerateRefreshToken();
 
-        _db.RefreshTokens.Add(new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            Token = refresh,
-            ExpiresAt = DateTimeOffset.UtcNow.AddDays(7)
-        });
+        _db.RefreshTokens.Add(CreateRefreshToken(user, refresh, tenantId));
         await _db.SaveChangesAsync();
 
         var roles = await _userManager.GetRolesAsync(user);
@@ -69,28 +67,29 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<ActionResult<TokenResponse>> Refresh(RefreshRequest req)
     {
-        var rt = await _db.RefreshTokens.FirstOrDefaultAsync(x => x.Token == req.RefreshToken);
-        if (rt is null || rt.RevokedAt != null || rt.ExpiresAt < DateTimeOffset.UtcNow) return Unauthorized();
+        var (rt, user, tenantId, errorResult) = await GetRefreshTokenContextAsync(req.RefreshToken);
+        if (errorResult is not null) return errorResult;
 
-        var user = await _userManager.FindByIdAsync(rt.UserId.ToString());
-        if (user is null) return Unauthorized();
+        if (rt is null || rt.RevokedAt != null || rt.ExpiresAt < DateTimeOffset.UtcNow) return Unauthorized();
 
         rt.RevokedAt = DateTimeOffset.UtcNow;
         var newToken = JwtTokenService.GenerateRefreshToken();
-        _db.RefreshTokens.Add(new RefreshToken { Id = Guid.NewGuid(), UserId = user.Id, Token = newToken, ExpiresAt = DateTimeOffset.UtcNow.AddDays(7) });
+        _db.RefreshTokens.Add(CreateRefreshToken(user!, newToken, tenantId));
 
-        var (access, exp) = await _tokens.CreateAccessTokenAsync(user);
+        var (access, exp) = await _tokens.CreateAccessTokenAsync(user!);
         await _db.SaveChangesAsync();
 
-        var roles = await _userManager.GetRolesAsync(user);
+        var roles = await _userManager.GetRolesAsync(user!);
         return new TokenResponse(access, newToken, (long)(exp - DateTimeOffset.UtcNow).TotalSeconds,
-            new { id = user.Id, name = user.FullName ?? user.UserName, email = user.Email, sucursalId = user.SucursalId, roles });
+            new { id = user!.Id, name = user.FullName ?? user.UserName, email = user.Email, sucursalId = user.SucursalId, roles });
     }
 
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(RefreshRequest req)
     {
-        var rt = await _db.RefreshTokens.FirstOrDefaultAsync(x => x.Token == req.RefreshToken);
+        var (rt, _, _, errorResult) = await GetRefreshTokenContextAsync(req.RefreshToken);
+        if (errorResult is not null) return errorResult;
+
         if (rt != null) { rt.RevokedAt = DateTimeOffset.UtcNow; await _db.SaveChangesAsync(); }
         return NoContent();
     }
@@ -311,22 +310,57 @@ public class AuthController : ControllerBase
         var user = await _userManager.FindByIdAsync(userId);
         if (user is null) return Unauthorized();
 
+        if (!TryGetValidTenantId(user, out var tenantId))
+            return Unauthorized(new { message = "El usuario autenticado no tiene un TenantId valido." });
+
         // Emite nuevo access token con sucursal override + refresh token nuevo
         var (access, exp) = await _tokens.CreateAccessTokenAsync(user, req.TargetSucursalId);
         var refresh = JwtTokenService.GenerateRefreshToken();
 
-        _db.RefreshTokens.Add(new Opticsoft.Domain.Entities.RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            Token = refresh,
-            ExpiresAt = DateTimeOffset.UtcNow.AddDays(7)
-        });
+        _db.RefreshTokens.Add(CreateRefreshToken(user, refresh, tenantId));
         await _db.SaveChangesAsync();
 
         var roles = await _userManager.GetRolesAsync(user);
 
         return new TokenResponse(access, refresh, (long)(exp - DateTimeOffset.UtcNow).TotalSeconds,
             new { id = user.Id, name = user.FullName ?? user.UserName, email = user.Email, sucursalId = user.SucursalId, roles });
+    }
+
+    private static bool TryGetValidTenantId(AppUser user, out Guid tenantId)
+    {
+        tenantId = user.TenantId;
+        return tenantId != Guid.Empty;
+    }
+
+    private RefreshToken CreateRefreshToken(AppUser user, string token, Guid tenantId)
+        => new()
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            UserId = user.Id,
+            Token = token,
+            ExpiresAt = DateTimeOffset.UtcNow.Add(RefreshTokenLifetime)
+        };
+
+    private async Task<(RefreshToken? Token, AppUser? User, Guid TenantId, ActionResult? ErrorResult)> GetRefreshTokenContextAsync(string refreshToken)
+    {
+        var persistedToken = await _db.RefreshTokens.FirstOrDefaultAsync(x => x.Token == refreshToken);
+        if (persistedToken is null)
+            return (null, null, Guid.Empty, null);
+
+        if (persistedToken.TenantId == Guid.Empty)
+            return (null, null, Guid.Empty, Unauthorized(new { message = "El refresh token persistido no tiene un TenantId valido." }));
+
+        var user = await _userManager.FindByIdAsync(persistedToken.UserId.ToString());
+        if (user is null)
+            return (null, null, Guid.Empty, Unauthorized(new { message = "El refresh token referencia un usuario inexistente." }));
+
+        if (!TryGetValidTenantId(user, out var tenantId))
+            return (null, null, Guid.Empty, Unauthorized(new { message = "El usuario asociado al refresh token no tiene un TenantId valido." }));
+
+        if (tenantId != persistedToken.TenantId)
+            return (null, null, Guid.Empty, Unauthorized(new { message = "El refresh token persistido tiene un TenantId inconsistente con el usuario." }));
+
+        return (persistedToken, user, tenantId, null);
     }
 }
