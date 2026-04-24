@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Opticsoft.Api.Auth;
+using Opticsoft.Application.Common.Interfaces;
 using Opticsoft.Application.Productos.Dtos;
 using Opticsoft.Domain.Entities;
 using Opticsoft.Domain.Enums;
@@ -19,7 +20,13 @@ public sealed record ProductUpdateDto(string Sku, string Nombre, string Categori
 public class ProductsController : ControllerBase
 {
     private readonly AppDbContext _db;
-    public ProductsController(AppDbContext db) => _db = db;
+    private readonly ITenantProvider _tenantProvider;
+
+    public ProductsController(AppDbContext db, ITenantProvider tenantProvider)
+    {
+        _db = db;
+        _tenantProvider = tenantProvider;
+    }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<ProductDto>>> Get([FromQuery] string? q = null)
@@ -46,13 +53,24 @@ public class ProductsController : ControllerBase
     [Authorize(Policy = Policies.Inventario_Editar)]
     public async Task<ActionResult<ProductDto>> Create(ProductCreateDto dto)
     {
+        if (!TryGetCurrentTenantId(out var tenantId, out var tenantError))
+            return tenantError!;
+
         if (await _db.Productos.AnyAsync(x => x.Sku == dto.Sku))
             return Conflict(new { message = "SKU duplicado." });
 
         if (!Enum.TryParse<CategoriaProducto>(dto.Categoria, true, out var cat))
             return BadRequest(new { message = "Categoría inválida." });
 
-        var p = new Producto { Id = Guid.NewGuid(), Sku = dto.Sku.Trim(), Nombre = dto.Nombre.Trim(), Categoria = cat, Activo = true };
+        var p = new Producto
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Sku = dto.Sku.Trim(),
+            Nombre = dto.Nombre.Trim(),
+            Categoria = cat,
+            Activo = true
+        };
         _db.Productos.Add(p);
         await _db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetById), new { id = p.Id }, new ProductDto(p.Id, p.Sku, p.Nombre, p.Categoria.ToString(), p.Activo));
@@ -62,8 +80,17 @@ public class ProductsController : ControllerBase
     [Authorize(Policy = Policies.Inventario_Editar)]
     public async Task<ActionResult<ProductDto>> Update(Guid id, ProductUpdateDto dto)
     {
-        var p = await _db.Productos.FindAsync(id);
+        if (!TryGetCurrentTenantId(out var tenantId, out var tenantError))
+            return tenantError!;
+
+        var p = await _db.Productos.FirstOrDefaultAsync(x => x.Id == id);
         if (p is null) return NotFound();
+
+        if (p.TenantId == Guid.Empty)
+            return Conflict(new { message = "El producto persistido no tiene un TenantId valido." });
+
+        if (p.TenantId != tenantId)
+            return BadRequest(new { message = "El producto no pertenece al tenant actual." });
 
         if (p.Sku != dto.Sku && await _db.Productos.AnyAsync(x => x.Sku == dto.Sku))
             return Conflict(new { message = "SKU duplicado." });
@@ -84,11 +111,20 @@ public class ProductsController : ControllerBase
     [Authorize(Policy = Policies.Inventario_Editar)]
     public async Task<IActionResult> Delete(Guid id)
     {
+        if (!TryGetCurrentTenantId(out var tenantId, out var tenantError))
+            return tenantError!;
+
         var used = await _db.Inventarios.AnyAsync(i => i.ProductoId == id);
         if (used) return Conflict(new { message = "No se puede borrar: el producto tiene inventario." });
 
-        var p = await _db.Productos.FindAsync(id);
+        var p = await _db.Productos.FirstOrDefaultAsync(x => x.Id == id);
         if (p is null) return NotFound();
+
+        if (p.TenantId == Guid.Empty)
+            return Conflict(new { message = "El producto persistido no tiene un TenantId valido." });
+
+        if (p.TenantId != tenantId)
+            return BadRequest(new { message = "El producto no pertenece al tenant actual." });
 
         _db.Productos.Remove(p);
         await _db.SaveChangesAsync();
@@ -149,5 +185,19 @@ public class ProductsController : ControllerBase
         }).ToList();
 
         return Ok(list);
+    }
+
+    private bool TryGetCurrentTenantId(out Guid tenantId, out ActionResult? errorResult)
+    {
+        tenantId = _tenantProvider.CurrentTenantId ?? Guid.Empty;
+
+        if (tenantId != Guid.Empty)
+        {
+            errorResult = null;
+            return true;
+        }
+
+        errorResult = Unauthorized(new { message = "Tenant no encontrado o token invalido." });
+        return false;
     }
 }

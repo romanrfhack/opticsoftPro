@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
+using Opticsoft.Application.Common.Interfaces;
 using Opticsoft.Application.Pacientes.Dtos;
 using Opticsoft.Application.Pacientes.Selectors;
 using Opticsoft.Domain.Dtos;
@@ -20,7 +21,13 @@ namespace Opticsoft.Api.Controllers;
 public class PacientesController : ControllerBase
 {
     private readonly AppDbContext _db;
-    public PacientesController(AppDbContext db) { _db = db; }
+    private readonly ITenantProvider _tenantProvider;
+
+    public PacientesController(AppDbContext db, ITenantProvider tenantProvider)
+    {
+        _db = db;
+        _tenantProvider = tenantProvider;
+    }
 
     // --- Requests/DTOs locales (ligeros para endpoints específicos) ---
     public sealed record CreatePacienteRequest(string Nombre, int Edad, string Telefono, string Ocupacion, string? Direccion);
@@ -53,7 +60,17 @@ public class PacientesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<PacienteItem>> Create(CreatePacienteRequest req, CancellationToken ct)
     {
-        var sucursalId = Guid.Parse(User.FindFirst("sucursalId")!.Value);
+        if (!TryGetCurrentTenantId(out var tenantId, out var tenantError))
+            return tenantError!;
+
+        if (!TryGetCurrentSucursalId(out var sucursalId, out var sucursalError))
+            return sucursalError!;
+
+        var sucursal = await _db.Sucursales
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == sucursalId, ct);
+        if (sucursal is null)
+            return BadRequest(new { message = "Sucursal invalida para el tenant actual." });
         
         string? GetClaim(params string[] types)
             => types.Select(t => User.FindFirst(t)?.Value)
@@ -74,6 +91,7 @@ public class PacientesController : ControllerBase
 
         var paciente = new Paciente
         {
+            TenantId = tenantId,
             Id = Guid.NewGuid(),
             Nombre = req.Nombre,
             Edad = req.Edad,
@@ -343,5 +361,34 @@ public class PacientesController : ControllerBase
 
         if (dto is null) return NotFound();
         return dto;
+    }
+
+    private bool TryGetCurrentTenantId(out Guid tenantId, out ActionResult? errorResult)
+    {
+        tenantId = _tenantProvider.CurrentTenantId ?? Guid.Empty;
+
+        if (tenantId != Guid.Empty)
+        {
+            errorResult = null;
+            return true;
+        }
+
+        errorResult = Unauthorized(new { message = "Tenant no encontrado o token invalido." });
+        return false;
+    }
+
+    private bool TryGetCurrentSucursalId(out Guid sucursalId, out ActionResult? errorResult)
+    {
+        sucursalId = Guid.Empty;
+
+        var sucursalClaim = User.FindFirstValue("sucursalId");
+        if (Guid.TryParse(sucursalClaim, out sucursalId) && sucursalId != Guid.Empty)
+        {
+            errorResult = null;
+            return true;
+        }
+
+        errorResult = Unauthorized(new { message = "Sucursal no encontrada o token invalido." });
+        return false;
     }
 }

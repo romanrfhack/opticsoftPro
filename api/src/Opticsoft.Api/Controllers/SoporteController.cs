@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
+using Opticsoft.Application.Common.Interfaces;
 using Opticsoft.Domain.Dtos;
 using Opticsoft.Domain.Entities;
 using Opticsoft.Infrastructure.Persistence;
@@ -17,10 +18,13 @@ namespace Opticsoft.Api.Controllers
     {
         private readonly AppDbContext _db;
         private readonly ILogger<SoporteController> _logger;
+        private readonly ITenantProvider _tenantProvider;
 
-        public SoporteController(AppDbContext db, ILogger<SoporteController> logger)
+        public SoporteController(AppDbContext db, ILogger<SoporteController> logger, ITenantProvider tenantProvider)
         {
-            _db = db; _logger = logger;
+            _db = db;
+            _logger = logger;
+            _tenantProvider = tenantProvider;
         }
 
         // POST /api/soporte
@@ -28,6 +32,9 @@ namespace Opticsoft.Api.Controllers
         [Authorize]
         public async Task<ActionResult<object>> Crear([FromBody] SupportCreateRequest req)
         {
+            if (!TryGetCurrentTenantId(out var tenantId, out var tenantError))
+                return tenantError!;
+
             // 🔹 Obtener sucursal, usuario y nombre desde el token (igual que en otros controladores)
             string? GetClaim(params string[] types)
                 => types.Select(t => User.FindFirst(t)?.Value)
@@ -49,6 +56,7 @@ namespace Opticsoft.Api.Controllers
 
             var ticket = new SupportTicket
             {
+                TenantId = tenantId,
                 Id = Guid.NewGuid(),
                 UserId = userId,
                 Email = email,
@@ -107,13 +115,36 @@ namespace Opticsoft.Api.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult> Cerrar(Guid id)
         {
+            if (!TryGetCurrentTenantId(out var tenantId, out var tenantError))
+                return tenantError!;
+
             var ticket = await _db.SupportTickets.FirstOrDefaultAsync(t => t.Id == id);
             if (ticket == null)
                 return NotFound();
 
+            if (ticket.TenantId == Guid.Empty)
+                return Conflict(new { message = "El ticket persistido no tiene un TenantId valido." });
+
+            if (ticket.TenantId != tenantId)
+                return BadRequest(new { message = "El ticket no pertenece al tenant actual." });
+
             ticket.Estado = "Cerrado";
             await _db.SaveChangesAsync();
             return NoContent();
+        }
+
+        private bool TryGetCurrentTenantId(out Guid tenantId, out ActionResult? errorResult)
+        {
+            tenantId = _tenantProvider.CurrentTenantId ?? Guid.Empty;
+
+            if (tenantId != Guid.Empty)
+            {
+                errorResult = null;
+                return true;
+            }
+
+            errorResult = Unauthorized(new { message = "Tenant no encontrado o token invalido." });
+            return false;
         }
 
     }
