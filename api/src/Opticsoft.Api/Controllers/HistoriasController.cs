@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
+using Opticsoft.Application.Common.Interfaces;
 using Opticsoft.Application.Visitas.Dtos;
 using Opticsoft.Domain.Dtos;
 using Opticsoft.Domain.Entities;
@@ -22,8 +23,14 @@ namespace Opticsoft.Api.Controllers;
 public class HistoriasController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly ITenantProvider _tenantProvider;
     private readonly UserManager<AppUser> _userManager;
-    public HistoriasController(AppDbContext db, UserManager<AppUser> um) { _db = db; _userManager = um; }  
+    public HistoriasController(AppDbContext db, UserManager<AppUser> um, ITenantProvider tenantProvider)
+    {
+        _db = db;
+        _userManager = um;
+        _tenantProvider = tenantProvider;
+    }
 
     public sealed record MaterialCHDto(Guid materialId, string? observaciones);
 
@@ -62,27 +69,70 @@ public class HistoriasController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<object>> Crear(CrearHistoriaRequest req)
     {
-        // Obtener información del usuario
-        var sucursalId = Guid.Parse(User.FindFirst("sucursalId")!.Value);
+        if (!TryGetCurrentTenantId(out var tenantId, out var tenantError))
+            return tenantError!;
 
-        string? GetClaim(params string[] types)
-            => types.Select(t => User.FindFirst(t)?.Value)
-                .FirstOrDefault(v => !string.IsNullOrEmpty(v));
+        if (!TryGetCurrentSucursalId(out var sucursalId, out var sucursalError))
+            return sucursalError!;
+
+        var sucursal = await _db.Sucursales
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == sucursalId);
+        if (sucursal is null)
+            return BadRequest(new { message = "Sucursal invalida para el tenant actual." });
+
+        var paciente = await _db.Pacientes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == req.pacienteId);
+        if (paciente is null)
+            return BadRequest(new { message = "Paciente invalido para el tenant actual." });
+
+        var materiales = req.materiales ?? Array.Empty<MaterialCHDto>();
+        if (materiales.Any(m => m.materialId == Guid.Empty))
+            return BadRequest(new { message = "Todos los materiales deben ser validos." });
+
+        var materialIds = materiales
+            .Select(m => m.materialId)
+            .Distinct()
+            .ToList();
+        if (materialIds.Count > 0)
+        {
+            var materialesCount = await _db.Materiales
+                .AsNoTracking()
+                .CountAsync(m => materialIds.Contains(m.Id));
+            if (materialesCount != materialIds.Count)
+                return BadRequest(new { message = "Uno o mas materiales no pertenecen al tenant actual." });
+        }
+
+        var armazones = req.armazones ?? Array.Empty<ArmazonDto>();
+        if (armazones.Any(a => a.productoId == Guid.Empty))
+            return BadRequest(new { message = "Todos los armazones deben ser validos." });
+
+        var productoIds = armazones
+            .Select(a => a.productoId)
+            .Distinct()
+            .ToList();
+        if (productoIds.Count > 0)
+        {
+            var productosCount = await _db.Productos
+                .AsNoTracking()
+                .CountAsync(p => productoIds.Contains(p.Id));
+            if (productosCount != productoIds.Count)
+                return BadRequest(new { message = "Uno o mas armazones no pertenecen al tenant actual." });
+        }
 
         var userIdStr = GetClaim(JwtRegisteredClaimNames.Sub, ClaimTypes.NameIdentifier, "sub");
-        var userEmail = GetClaim(JwtRegisteredClaimNames.Email, ClaimTypes.Email, "email");
         var userName = GetClaim("name", ClaimTypes.Name, JwtRegisteredClaimNames.UniqueName) ?? User.Identity?.Name;
 
-        if (string.IsNullOrEmpty(userIdStr))
+        if (!Guid.TryParse(userIdStr, out var userId))
         {
             return BadRequest("No se pudo identificar al usuario");
         }
 
-        var userId = Guid.Parse(userIdStr);
-
         // Crear la visita
         var visita = new HistoriaClinicaVisita
         {
+            TenantId = tenantId,
             Id = Guid.NewGuid(),
             PacienteId = req.pacienteId,
             SucursalId = sucursalId,
@@ -101,6 +151,7 @@ public class HistoriasController : ControllerBase
 
             visita.Agudezas.Add(new AgudezaVisual
             {
+                TenantId = tenantId,
                 Id = Guid.NewGuid(),
                 VisitaId = visita.Id,
                 Condicion = cond,
@@ -117,6 +168,7 @@ public class HistoriasController : ControllerBase
 
             visita.Rx.Add(new RxMedicion
             {
+                TenantId = tenantId,
                 Id = Guid.NewGuid(),
                 VisitaId = visita.Id,
                 Ojo = ojo,
@@ -131,10 +183,11 @@ public class HistoriasController : ControllerBase
         }
 
         // Materiales
-        foreach (var m in req.materiales ?? Array.Empty<MaterialCHDto>())
+        foreach (var m in materiales)
         {
             visita.Materiales.Add(new PrescripcionMaterial
             {
+                TenantId = tenantId,
                 Id = Guid.NewGuid(),
                 VisitaId = visita.Id,
                 MaterialId = m.materialId,
@@ -143,10 +196,11 @@ public class HistoriasController : ControllerBase
         }
 
         // ✅ NUEVO: Armazones
-        foreach (var armazon in req.armazones ?? Array.Empty<ArmazonDto>())
+        foreach (var armazon in armazones)
         {
             visita.Armazon.Add(new PrescripcionArmazon
             {
+                TenantId = tenantId,
                 Id = Guid.NewGuid(),
                 VisitaId = visita.Id,
                 ProductoId = armazon.productoId,
@@ -162,6 +216,7 @@ public class HistoriasController : ControllerBase
 
             visita.LentesContacto.Add(new PrescripcionLenteContacto
             {
+                TenantId = tenantId,
                 Id = Guid.NewGuid(),
                 VisitaId = visita.Id,
                 Tipo = tipo,
@@ -478,11 +533,20 @@ public class HistoriasController : ControllerBase
     [HttpPost("{id:guid}/pagos")]
     public async Task<IActionResult> AgregarPagos(Guid id, PagoDto[] pagos)
     {
+        if (!TryGetCurrentTenantId(out var tenantId, out var tenantError))
+            return tenantError!;
+
         var visita = await _db.Visitas
             .Include(v => v.Pagos)
             .FirstOrDefaultAsync(v => v.Id == id);
 
         if (visita is null) return NotFound();
+
+        if (visita.TenantId == Guid.Empty)
+            return Conflict(new { message = "La visita persistida no tiene un TenantId valido." });
+
+        if (visita.TenantId != tenantId)
+            return BadRequest(new { message = "La visita no pertenece al tenant actual." });
 
         foreach (var pago in pagos)
         {
@@ -491,6 +555,7 @@ public class HistoriasController : ControllerBase
 
             visita.Pagos.Add(new HistoriaPago
             {
+                TenantId = visita.TenantId,
                 VisitaId = id,
                 Metodo = metodo,
                 Monto = pago.Monto,
@@ -531,6 +596,9 @@ public class HistoriasController : ControllerBase
     [Authorize]
     public async Task<ActionResult> EnviarALaboratorio(Guid id, [FromBody] EnviarLabRequestDto body)
     {
+        if (!TryGetCurrentTenantId(out var tenantId, out var tenantError))
+            return tenantError!;
+
         var h = await _db.Visitas
             .Include(x => x.Visitas)
                 .ThenInclude(v => v.Pagos)
@@ -538,8 +606,20 @@ public class HistoriasController : ControllerBase
 
         if (h == null) return NotFound();
 
+        if (h.TenantId == Guid.Empty)
+            return Conflict(new { message = "La visita persistida no tiene un TenantId valido." });
+
+        if (h.TenantId != tenantId)
+            return BadRequest(new { message = "La visita no pertenece al tenant actual." });
+
         var last = h.Visitas.OrderByDescending(v => v.Fecha).FirstOrDefault();
         if (last == null) return BadRequest("Historia sin visitas.");
+
+        if (last.TenantId == Guid.Empty)
+            return Conflict(new { message = "La visita relacionada no tiene un TenantId valido." });
+
+        if (last.TenantId != tenantId)
+            return BadRequest(new { message = "La visita relacionada no pertenece al tenant actual." });
 
         last.Total = body.Total;
         var pagos = body.Pagos ?? new();
@@ -549,7 +629,8 @@ public class HistoriasController : ControllerBase
         {
             last.Pagos.Add(new Opticsoft.Domain.Entities.HistoriaPago()
             {
-                Id = Guid.NewGuid(),
+                TenantId = last.TenantId,
+                VisitaId = last.Id,
                 Fecha = DateTime.UtcNow,
                 Metodo = Enum.Parse<Opticsoft.Domain.Enums.MetodoPago>(p.Metodo, ignoreCase: true),
                 Monto = p.Monto,
@@ -657,11 +738,17 @@ public class HistoriasController : ControllerBase
     [HttpPost("{id:guid}/status")]
     public async Task<ActionResult<ChangeVisitaStatusResponse>> ChangeStatus(Guid id, [FromBody] ChangeVisitaStatusRequest body)
     {
-        var sucursalId = Guid.Parse(User.FindFirst("sucursalId")!.Value);
+        if (!TryGetCurrentTenantId(out var tenantId, out var tenantError))
+            return tenantError!;
 
-        string? GetClaim(params string[] types)
-            => types.Select(t => User.FindFirst(t)?.Value)
-                .FirstOrDefault(v => !string.IsNullOrEmpty(v));
+        if (!TryGetCurrentSucursalId(out var sucursalId, out var sucursalError))
+            return sucursalError!;
+
+        var sucursal = await _db.Sucursales
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == sucursalId);
+        if (sucursal is null)
+            return BadRequest(new { message = "Sucursal invalida para el tenant actual." });
 
         var usuarioId = GetClaim(JwtRegisteredClaimNames.Sub, ClaimTypes.NameIdentifier, "sub");
         var usuarioNom = GetClaim("name", ClaimTypes.Name, JwtRegisteredClaimNames.UniqueName) ?? User.Identity?.Name;
@@ -681,6 +768,12 @@ public class HistoriasController : ControllerBase
             visita = await _db.Visitas.FirstOrDefaultAsync(v => v.Id == id && v.Estado == EstadoHistoria.ListaParaEnvio);
         }
         if (visita is null) return NotFound("Visita no encontrada en tu sucursal.");
+
+        if (visita.TenantId == Guid.Empty)
+            return Conflict(new { message = "La visita persistida no tiene un TenantId valido." });
+
+        if (visita.TenantId != tenantId)
+            return BadRequest(new { message = "La visita no pertenece al tenant actual." });
 
         var fromStatus = visita.Estado;
         var toStatusValue = body.ToStatus;
@@ -717,14 +810,18 @@ public class HistoriasController : ControllerBase
             // Insertar en historial
             Debug.Assert(usuarioId != null, nameof(usuarioId) + " != null");
             Debug.Assert(usuarioNom != null, nameof(usuarioNom) + " != null");
+            if (!Guid.TryParse(usuarioId, out var usuarioIdGuid))
+                return BadRequest("No se pudo identificar al usuario.");
+
             var entry = new VisitaStatusHistory
             {
+                TenantId = visita.TenantId,
                 VisitaId = visita.Id,
                 FromStatus = fromStatus.ToString(),
                 ToStatus = nuevoEstado.ToString(),
-                UsuarioId = Guid.Parse(usuarioId),
+                UsuarioId = usuarioIdGuid,
                 UsuarioNombre = usuarioNom,
-                SucursalId = sucursalId,
+                SucursalId = visita.SucursalId,
                 TimestampUtc = DateTimeOffset.UtcNow,
                 Observaciones = body.Observaciones,
                 LabTipo = nuevoEstado == EstadoHistoria.EnviadaALaboratorio ? body.LabTipo : null,
@@ -883,23 +980,23 @@ public class HistoriasController : ControllerBase
         if (body?.Conceptos is null || body.Conceptos.Count == 0)
             return BadRequest("Debe enviar al menos un concepto.");
 
-        // Claims (sucursal y usuario)
-        var sucursalIdClaim = User.FindFirst("sucursalId")?.Value;
-        if (string.IsNullOrWhiteSpace(sucursalIdClaim))
-            return Forbid();
+        if (!TryGetCurrentTenantId(out var tenantId, out var tenantError))
+            return tenantError!;
 
-        var sucursalId = Guid.Parse(sucursalIdClaim);
+        if (!TryGetCurrentSucursalId(out var sucursalId, out var sucursalError))
+            return sucursalError!;
 
-        string? GetClaim(params string[] types)
-            => types.Select(t => User.FindFirst(t)?.Value).FirstOrDefault(v => !string.IsNullOrEmpty(v));
+        var sucursal = await _db.Sucursales
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == sucursalId);
+        if (sucursal is null)
+            return BadRequest(new { message = "Sucursal invalida para el tenant actual." });
 
         var userIdStr = GetClaim(JwtRegisteredClaimNames.Sub, ClaimTypes.NameIdentifier, "sub");
         var userName = GetClaim("name", ClaimTypes.Name, JwtRegisteredClaimNames.UniqueName) ?? User.Identity?.Name;
 
-        if (string.IsNullOrWhiteSpace(userIdStr) || string.IsNullOrWhiteSpace(userName))
+        if (!Guid.TryParse(userIdStr, out var userId) || string.IsNullOrWhiteSpace(userName))
             return BadRequest("No se pudo identificar al usuario.");
-
-        var userId = Guid.Parse(userIdStr);
 
         // Traer la visita validando que pertenezca a la sucursal
         var visita = await _db.Visitas
@@ -908,6 +1005,12 @@ public class HistoriasController : ControllerBase
 
         if (visita is null)
             return NotFound("Visita no encontrada en tu sucursal.");
+
+        if (visita.TenantId == Guid.Empty)
+            return Conflict(new { message = "La visita persistida no tiene un TenantId valido." });
+
+        if (visita.TenantId != tenantId)
+            return BadRequest(new { message = "La visita no pertenece al tenant actual." });
 
         // Validaciones simples
         foreach (var c in body.Conceptos)
@@ -932,13 +1035,14 @@ public class HistoriasController : ControllerBase
             var now = DateTimeOffset.UtcNow;
             var nuevos = body.Conceptos.Select(c => new VisitaConcepto
             {
+                TenantId = visita.TenantId,
                 Id = Guid.NewGuid(),
                 VisitaId = visita.Id,
                 Concepto = c.Concepto.Trim(),
                 Monto = c.Monto,
                 UsuarioId = userId,
                 UsuarioNombre = userName!,
-                SucursalId = sucursalId,
+                SucursalId = visita.SucursalId,
                 TimestampUtc = now,
                 Observaciones = string.IsNullOrWhiteSpace(c.Observaciones) ? null : c.Observaciones!.Trim()
             }).ToList();
@@ -970,6 +1074,39 @@ public class HistoriasController : ControllerBase
 
     private static bool IsAllowedTransition(string from, string? to)
             => to is not null && Allowed.TryGetValue(from, out var next) && next.Contains(to);
+
+    private string? GetClaim(params string[] types)
+        => types.Select(t => User.FindFirst(t)?.Value)
+            .FirstOrDefault(v => !string.IsNullOrEmpty(v));
+
+    private bool TryGetCurrentTenantId(out Guid tenantId, out ActionResult? errorResult)
+    {
+        tenantId = _tenantProvider.CurrentTenantId ?? Guid.Empty;
+
+        if (tenantId != Guid.Empty)
+        {
+            errorResult = null;
+            return true;
+        }
+
+        errorResult = Unauthorized(new { message = "Tenant no encontrado o token invalido." });
+        return false;
+    }
+
+    private bool TryGetCurrentSucursalId(out Guid sucursalId, out ActionResult? errorResult)
+    {
+        sucursalId = Guid.Empty;
+
+        var sucursalClaim = User.FindFirstValue("sucursalId");
+        if (Guid.TryParse(sucursalClaim, out sucursalId) && sucursalId != Guid.Empty)
+        {
+            errorResult = null;
+            return true;
+        }
+
+        errorResult = Unauthorized(new { message = "Sucursal no encontrada o token invalido." });
+        return false;
+    }
         
     public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
 
